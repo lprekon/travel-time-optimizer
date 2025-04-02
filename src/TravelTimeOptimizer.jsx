@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 
-const API_BASE_URL = "api.mapbox.com";
+const API_BASE_URL = "https://api.mapbox.com";
 
 const TravelTimeOptimizer = () => {
   const [destinations, setDestinations] = useState([]);
@@ -13,13 +13,14 @@ const TravelTimeOptimizer = () => {
   const [mapCenter, setMapCenter] = useState([37.7749, -122.4194]);
   const [mapZoom, setMapZoom] = useState(12);
   const [sampleRadius, setSampleRadius] = useState(5);
-  const mapRef = useRef(null);
+  // const mapRef = useRef(null);
 
   const [geocodeResult, setGeocodeResult] = useState(null);
   const [addressString, setAddressString] = useState("");
 
   const geocodeAddress = async (addressString) => {
-    const API_KEY = process.env.MAPBOX_ACCESS_TOKEN;
+    console.log("Geocoding address: ", addressString);
+    const API_KEY = import.meta.env.VITE_MAPBOX_TOKEN;
     if (!API_KEY) {
       setError("Mapbox API key is missing");
       return null;
@@ -34,9 +35,11 @@ const TravelTimeOptimizer = () => {
         "/search/geocode/v6/forward?q=" +
         encodeURIComponent(addressString) +
         "&access_token=" +
-        process.env.MAPBOX_ACCESS_TOKEN;
+        API_KEY;
       const response = await fetch(url);
+      console.log("Response: ", response);
       const data = await response.json();
+      console.log("Data: ", data);
       if (data.features && data.features.length > 0) {
         // received valid data
         // get the first (best) result
@@ -55,6 +58,7 @@ const TravelTimeOptimizer = () => {
 
   const handleGeocodeTest = async (e) => {
     e.preventDefault();
+    console.log("Geocode test submitted");
     setError("");
     const result = await geocodeAddress(address);
     if (result) {
@@ -64,7 +68,23 @@ const TravelTimeOptimizer = () => {
     }
   };
 
-  return (<h1>Geocoding Test</h1>);
+  return (
+    <div>
+    <h1>Geocoding Test</h1>
+    <form onSubmit={handleGeocodeTest}>
+      <input type="text" id="address" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Enter address" />
+      <button type="submit">Geocode</button>
+    </form>
+    {error && <p style={{ color: "red" }}>{error}</p>}
+    {geocodeResult && (
+      <div>
+        <h2>Geocoding Result</h2>
+        <p>Latitude: {geocodeResult.lat}</p>
+        <p>Longitude: {geocodeResult.lng}</p>
+      </div>
+    )}
+    </div>
+  );
 };
 
 export default TravelTimeOptimizer;
