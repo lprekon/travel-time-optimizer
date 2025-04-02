@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 
 const API_BASE_URL = "api.mapbox.com";
 
@@ -15,7 +15,19 @@ const TravelTimeOptimizer = () => {
   const [sampleRadius, setSampleRadius] = useState(5);
   const mapRef = useRef(null);
 
+  const [geocodeResult, setGeocodeResult] = useState(null);
+  const [addressString, setAddressString] = useState("");
+
   const geocodeAddress = async (addressString) => {
+    const API_KEY = process.env.MAPBOX_ACCESS_TOKEN;
+    if (!API_KEY) {
+      setError("Mapbox API key is missing");
+      return null;
+    }
+    if (!addressString) {
+      setError("Address is required");
+      return null;
+    }
     try {
       const url =
         API_BASE_URL +
@@ -41,7 +53,18 @@ const TravelTimeOptimizer = () => {
     }
   };
 
-  return "This is the TravelTimeOptimizer component";
+  const handleGeocodeTest = async (e) => {
+    e.preventDefault();
+    setError("");
+    const result = await geocodeAddress(address);
+    if (result) {
+      setGeocodeResult(result);
+    } else {
+      setGeocodeResult(null);
+    }
+  };
+
+  return (<h1>Geocoding Test</h1>);
 };
 
 export default TravelTimeOptimizer;
