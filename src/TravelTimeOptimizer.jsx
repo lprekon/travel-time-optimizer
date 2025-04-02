@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { v4 as uuidv4 } from "uuid";
 
 const API_BASE_URL = "https://api.mapbox.com";
 
@@ -56,33 +57,100 @@ const TravelTimeOptimizer = () => {
     }
   };
 
-  const handleGeocodeTest = async (e) => {
+  const addDestination = async (e) => {
     e.preventDefault();
-    console.log("Geocode test submitted");
-    setError("");
-    const result = await geocodeAddress(address);
-    if (result) {
-      setGeocodeResult(result);
-    } else {
-      setGeocodeResult(null);
+    if (!name || !address || !weight) {
+      setError("All fields are required");
+      return;
     }
+    try {
+      var weightValue;
+      if (weight.includes("")) {
+        const splitWeight = weight.split("/");
+        weightValue = parseFloat(splitWeight[0]) / parseFloat(splitWeight[1]);
+      } else {
+        weightValue = parseFloat(weight);
+      }
+      if (isNaN(weightValue) || weightValue <= 0) {
+        setError("Weight must be a positive number");
+        return;
+      }
+      const coordinates = await geocodeAddress(address);
+      if (!coordinates) {
+        return;
+      }
+
+      const newDestination = {
+        id: uuidv4(),
+        name,
+        address,
+        weight: weightValue,
+        coordinates,
+      };
+
+      setDestinations([...destinations, newDestination]);
+
+      // Reset form fields
+      setName("");
+      setAddress("");
+      setWeight("1");
+      setError("");
+      setGeocodeResult(null);
+    } catch (error) {
+      console.error("Error adding destination: ", error);
+      setError("Error adding destination: " + error.message);
+      return;
+    }
+  };
+
+  const handleAddDestination = async (e) => {
+    e.preventDefault();
+    console.log("Address test submitted");
+    setError("");
+    addDestination(e);
   };
 
   return (
     <div>
-    <h1>Geocoding Test</h1>
-    <form onSubmit={handleGeocodeTest}>
-      <input type="text" id="address" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Enter address" />
-      <button type="submit">Geocode</button>
-    </form>
-    {error && <p style={{ color: "red" }}>{error}</p>}
-    {geocodeResult && (
-      <div>
-        <h2>Geocoding Result</h2>
-        <p>Latitude: {geocodeResult.lat}</p>
-        <p>Longitude: {geocodeResult.lng}</p>
-      </div>
-    )}
+      <h1>Add Destination Test</h1>
+      <form onSubmit={handleAddDestination}>
+        <input
+          type="text"
+          id="name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Enter name"
+        />
+        <input
+          type="text"
+          id="address"
+          value={address}
+          onChange={(e) => setAddress(e.target.value)}
+          placeholder="Enter address"
+        />
+        <input
+          type="text"
+          id="weight"
+          value={weight}
+          onChange={(e) => setWeight(e.target.value)}
+          placeholder="Enter weight"
+        />
+        <button type="submit">Add Destination</button>
+      </form>
+      {error && <p style={{ color: "red" }}>{error}</p>}
+      <ul>
+        {destinations.map((destination) => (
+          <li key={destination.id}>
+            <h3>{destination.name}</h3>
+            <p>{destination.address}</p>
+            <p>Weight: {destination.weight}</p>
+            <p>
+              Coordinates: {destination.coordinates.lat},{" "}
+              {destination.coordinates.lng}
+            </p>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 };
