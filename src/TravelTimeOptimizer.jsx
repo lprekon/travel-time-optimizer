@@ -1,5 +1,10 @@
 import React, { useState } from "react";
 import { v4 as uuidv4 } from "uuid";
+import {
+  calculateMidpoint,
+  calculateMaxDistance,
+  generateSamplePoints,
+} from "./SphericalGeometry.js";
 
 const API_BASE_URL = "https://api.mapbox.com";
 
@@ -18,8 +23,8 @@ const TravelTimeOptimizer = () => {
   const [sampleRadius, setSampleRadius] = useState(5);
   // const mapRef = useRef(null);
 
-  const [geocodeResult, setGeocodeResult] = useState(null);
-  const [addressString, setAddressString] = useState("");
+  const [pointsFired, setPointsFired] = useState(0);
+  const [totalPoints, setTotalPoints] = useState(0);
 
   const geocodeAddress = async (addressString) => {
     console.log("Geocoding address: ", addressString);
@@ -60,6 +65,7 @@ const TravelTimeOptimizer = () => {
   };
 
   const addDestination = async (e) => {
+    console.log("Adding destination: ", name, address, weight);
     e.preventDefault();
     if (!name || !address || !weight) {
       setError("All fields are required");
@@ -97,7 +103,6 @@ const TravelTimeOptimizer = () => {
       setAddress("");
       setWeight("1");
       setError("");
-      setGeocodeResult(null);
     } catch (error) {
       console.error("Error adding destination: ", error);
       setError("Error adding destination: " + error.message);
@@ -110,6 +115,8 @@ const TravelTimeOptimizer = () => {
       setError("At least two destinations are required to generate a heatmap");
       return;
     }
+    console.log("Generating heatmap data...");
+    setHeatmapData([]);
 
     setIsCalculating(true);
     setError("");
@@ -120,58 +127,64 @@ const TravelTimeOptimizer = () => {
     // generate sample points around the midpoint
     const samplePoints = generateSamplePoints(midpoint, radius);
 
-    const results = [];
-    for (const point of samplePoints) {
-      // for each sample point, get the travel times to all destinations
-      const travelTimes = await getWeightedTravelTimes(point);
-      if (travelTimes) {
-        // calculate the average of the weighted travel times
-        const avgTravelTime =
-          travelTimes.reduce((acc, time) => acc + time, 0) / travelTimes.length;
-        results.push({ point, avgTravelTime });
-      }
-    }
-
-    // normalize the results
-    const timeValues = results.map((result) => result.avgTravelTime);
-    const minTime = Math.min(...timeValues);
-    const maxTime = Math.max(...timeValues);
-    const normalizedResults = results.map((result) => ({
-      ...result,
-      normalizedTime: (result.avgTravelTime - minTime) / (maxTime - minTime),
-    }));
-    console.log("Normalized results: ", normalizedResults);
+    setTotalPoints(samplePoints.length);
+    let pointsFired = 0;
+    setPointsFired(0);
     setIsCalculating(false);
-    setHeatmapData(normalizedResults);
+
+    // const travelTimePromises = [];
+    // // fire off all the travel time API requests in parallel, let them process as they come in
+    // for (const point of samplePoints) {
+    //   console.log();
+    //   // for each sample point, get the travel times to all destinations
+    //   pointsFired++;
+    //   setPointsFired(pointsFired);
+    //   travelTimePromises.push(
+    //     getRawTravelTimes(point).then((response) => {
+    //       if (!response.ok) {
+    //         throw new Error("Error fetching travel times");
+    //       }
+    //       const data = response.json();
+    //       const weightedTravelTimes = weightTravelTimes(
+    //         data.durations[0].slice(1)
+    //       ); // skip the first element (the travel time to itself)
+    //       // return the average
+    //       return (
+    //         weightedTravelTimes.reduce((a, b) => a + b, 0) /
+    //         weightedTravelTimes.length
+    //       );
+    //     })
+    //   );
+    // }
+    // // wait for all the weighted times to come back before continuing. It'll be easier to pair each row of results up with the proper sample point out here
+    // const weightedAverageTravelTimes = await Promise.all(travelTimePromises);
+    // console.assert(
+    //   weightedAverageTravelTimes.length === samplePoints.length,
+    //   "Mismatch in lengths"
+    // );
+    // const results = [];
+    // for (let i = 0; i < samplePoints.length; i++) {
+    //   results.push({
+    //     coordinates: samplePoints[i],
+    //     avgTravelTime: weightedAverageTravelTimes[i],
+    //   });
+    // }
+
+    // // normalize the results
+    // const timeValues = results.map((result) => result.avgTravelTime);
+    // const minTime = Math.min(...timeValues);
+    // const maxTime = Math.max(...timeValues);
+    // const normalizedResults = results.map((result) => ({
+    //   ...result,
+    //   normalizedTime: (result.avgTravelTime - minTime) / (maxTime - minTime),
+    // }));
+    // console.log("Normalized results: ", normalizedResults);
+    // setIsCalculating(false);
+    // setHeatmapData(normalizedResults);
   };
 
-  // generate samplepoints around the midpoint outside the radius, which a spaceing in miles of gridSpacing, defaulting to 0.5 miles
-  const generateSamplePoints = (midpoint, radius, gridSpacing = 0.5) => {
-    const samplePoints = [];
-
-    const cosCR = Math.cos(radius / EARTH_RADIUS_MILES); // calculate the cosine of the angle subtended by an arc `radius` miles on the surface of the Earth
-    for (
-      let verticalDisplacementMiles = radius;
-      verticalDisplacementMiles >= -radius;
-      verticalDisplacementMiles -= gridSpacing
-    ) {
-      const cosAR = Math.cos(verticalDisplacementMiles / EARTH_RADIUS_MILES); // calculate the cosine of the angle subtended by an arc `verticalDisplacementMiles` miles on the surface of the Earth
-      const maxLateralDisplacementMiles =
-        Math.acos(cosCR / cosAR) * EARTH_RADIUS_MILES; // calculate the maximum lateral displacement in miles, by solving the spherical pythagorean theorem
-      for (
-        let lateralDisplacementMiles = -maxLateralDisplacementMiles;
-        lateralDisplacementMiles <= maxLateralDisplacementMiles;
-        lateralDisplacementMiles += gridSpacing
-      ) {
-        const lat = vertMilesToLat(verticalDisplacementMiles) + midpoint.lat;
-        const lng = latMilesToLng(lateralDisplacementMiles, lat) + midpoint.lng;
-        samplePoints.push({ lat, lng }); // should always be within our radius thanks to the fancy spherical pythagorean math above
-      }
-    }
-    return samplePoints;
-  };
-
-  const getWeightedTravelTimes = async (point) => {
+  // Get the travel times from the Mapbox API, returning the Promise
+  const getRawTravelTimes = (point) => {
     if (!API_KEY) {
       setError("Mapbox API key is missing");
       return null;
@@ -204,74 +217,15 @@ const TravelTimeOptimizer = () => {
       "?" +
       new URLSearchParams(apiParams);
     console.log("URL: ", url);
-    try {
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error("Error fetching travel times");
-      }
-      const data = await response.json();
-      console.log("Data: ", data);
-      if (data.code !== "Ok") {
-        throw new Error("Error fetching travel times: " + data.message);
-      }
-      const rawDurations = data.durations[0].slice(1); // skip the first element (the time to the point itself)
-      const weightedDurations = rawDurations.map((duration, index) => {
-        destinations[index].weight * duration;
-      });
-
-      return weightedDurations;
-    } catch (error) {
-      console.error("Error fetching travel times: ", error);
-      setError("Error fetching travel times: " + error.message);
-      return null;
-    }
+    return fetch(url); // return the fetch promise
   };
 
-  const vertMilesToLat = (verticalDisplacementMiles) => {
-    return verticalDisplacementMiles / 69;
-  };
-
-  const latMilesToLng = (lateralDisplacementMiles, lat) => {
-    return lateralDisplacementMiles / (69 * Math.cos(lat * (Math.PI / 180)));
-  };
-
-  const calculateMidpoint = (destinations) => {
-    const latSum = destinations.reduce(
-      (sum, dest) => sum + dest.coordinates.lat,
-      0
-    );
-    const lngSum = destinations.reduce(
-      (sum, dest) => sum + dest.coordinates.lng,
-      0
-    );
-    const midLat = latSum / destinations.length;
-    const midLng = lngSum / destinations.length;
-    return { lat: midLat, lng: midLng };
-  };
-
-  const calculateMaxDistance = (midpoint, destinations) => {
-    let maxDistance = 5; // default to 5 miles
-    const distances = destinations.map((dest) => {
-      const distance = calculateHaversineDistance(midpoint, dest.coordinates);
-      if (distance > maxDistance) {
-        maxDistance = distance;
-      }
+  const weightTravelTimes = (rawTravelTimes) => {
+    const weightedTravelTimes = rawTravelTimes.map((time, index) => {
+      const weight = destinations[index].weight;
+      return time * weight;
     });
-    return maxDistance;
-  };
-
-  const calculateHaversineDistance = (point1, point2) => {
-    const dLat = point2.lat - point1.lat * (Math.PI / 180); // Convert to radians
-    const dLng = point2.lng - point1.lng * (Math.PI / 180); // Convert to radians
-    const lat1Rad = point1.lat * (Math.PI / 180); // Convert to radians
-    const lat2Rad = point2.lat * (Math.PI / 180); // Convert to radians
-    const a =
-      1 -
-      Math.cos(dLat) +
-      Math.cos(lat1Rad) * Math.cos(lat2Rad) * (1 - Math.cos(dLng));
-    const b = Math.sqrt(a / 2);
-    const c = 2 * EARTH_RADIUS_MILES * Math.asin(b);
-    return c;
+    return weightedTravelTimes;
   };
 
   const handleAddDestination = async (e) => {
@@ -311,6 +265,9 @@ const TravelTimeOptimizer = () => {
       <button onClick={generateHeatMap} disabled={isCalculating}>
         Generate Heatmap Data
       </button>
+      <p>
+        {pointsFired} / {totalPoints}
+      </p>
       {error && <p style={{ color: "red" }}>{error}</p>}
       <ul>
         {destinations.map((destination) => (
