@@ -6,28 +6,26 @@ const generateSamplePoints = (midpoint, radius, gridSpacing = 0.5) => {
   console.log("Grid spacing: ", gridSpacing);
   console.log(
     "approximate total points:",
-    (radius / gridSpacing) ** 2 * (Math.PI / 4)
+    ((2 * radius) / gridSpacing) ** 2 * (Math.PI / 4)
   );
   const samplePoints = [];
 
   let pointCount = 0;
   const cosCR = Math.cos(radius / EARTH_RADIUS_MILES); // calculate the cosine of the angle subtended by an arc `radius` miles on the surface of the Earth
-  for (
-    let verticalDisplacementMiles = radius;
-    verticalDisplacementMiles >= -radius;
-    verticalDisplacementMiles -= gridSpacing
-  ) {
-    const cosAR = Math.cos(verticalDisplacementMiles / EARTH_RADIUS_MILES); // calculate the cosine of the angle subtended by an arc `verticalDisplacementMiles` miles on the surface of the Earth
-    const maxLateralDisplacementMiles =
-      Math.acos(cosCR / cosAR) * EARTH_RADIUS_MILES; // calculate the maximum lateral displacement in miles, by solving the spherical pythagorean theorem
-    for (
-      let lateralDisplacementMiles = -maxLateralDisplacementMiles;
-      lateralDisplacementMiles <= maxLateralDisplacementMiles;
-      lateralDisplacementMiles += gridSpacing
-    ) {
-      const lat = vertMilesToLat(verticalDisplacementMiles) + midpoint.lat;
-      const lng = latMilesToLng(lateralDisplacementMiles, lat) + midpoint.lng;
-      samplePoints.push({ lat, lng }); // should always be within our radius thanks to the fancy spherical pythagorean math above
+  // this is the "dumber" but simpler way to generate sample points.
+  for (let vDisM = -radius; vDisM <= radius; vDisM += gridSpacing) {
+    for (let hDisM = -radius; hDisM <= radius; hDisM += gridSpacing) {
+      const latStep = vertMilesToLat(vDisM);
+      const pointLat = midpoint.lat + latStep;
+      const lngStep = latMilesToLng(hDisM, pointLat);
+      const pointLng = midpoint.lng + lngStep;
+      const newPoint = { lat: pointLat, lng: pointLng };
+      const newPointDist = haversineDistanceMiles(midpoint, newPoint);
+      if (newPointDist > radius) {
+        continue; // Skip points within the radius
+      }
+      samplePoints.push(newPoint);
+
       pointCount++;
       if (pointCount >= 1000000) {
         console.log("Point count exceeded 1 million, stopping generation");
@@ -35,6 +33,7 @@ const generateSamplePoints = (midpoint, radius, gridSpacing = 0.5) => {
       }
     }
   }
+  console.log("Generated sample points: ", samplePoints.length);
   return samplePoints;
 };
 
@@ -60,13 +59,12 @@ const calculateMidpoint = (destinations) => {
 };
 
 const calculateMaxDistance = (midpoint, destinations) => {
+  console.log("Calculating max distance...");
   let maxDistance = 5; // default to 5 miles
   const distances = destinations.map((dest) => {
     // const distance = calculateHaversineDistance(midpoint, dest.coordinates);
-    const distance = calculateHaversineDistanceMiles(
-      midpoint,
-      dest.coordinates
-    );
+    const distance = haversineDistanceMiles(midpoint, dest.coordinates);
+    console.log({ midpoint, dest, distance });
     if (distance > maxDistance) {
       maxDistance = distance;
     }
@@ -74,21 +72,28 @@ const calculateMaxDistance = (midpoint, destinations) => {
   return maxDistance;
 };
 
-const calculateHaversineDistanceMiles = (point1, point2) => {
-  const dLat = point2.lat - point1.lat * (Math.PI / 180); // Convert to radians
-  const dLng = point2.lng - point1.lng * (Math.PI / 180); // Convert to radians
-  const lat1Rad = point1.lat * (Math.PI / 180); // Convert to radians
-  const lat2Rad = point2.lat * (Math.PI / 180); // Convert to radians
-  const a =
-    1 -
-    Math.cos(dLat / 2) +
-    Math.cos(lat1Rad) * Math.cos(lat2Rad) * (1 - Math.cos(dLng / 2));
-  const b = Math.sqrt(a);
-  const c = 2 * EARTH_RADIUS_MILES * Math.asin(b);
-  return c;
+const haversine = (point1, point) => {
+  const lat1Rad = point1.lat * (Math.PI / 180);
+  const lat2Rad = point.lat * (Math.PI / 180);
+  const dLat = (point.lat - point1.lat) * (Math.PI / 180);
+  const dLng = (point.lng - point1.lng) * (Math.PI / 180);
+
+  const a = (1 - Math.cos(dLat)) / 2;
+  const b = Math.cos(lat1Rad) * Math.cos(lat2Rad);
+  const c = (1 - Math.cos(dLng)) / 2;
+
+  const haversine = a + b * c;
+  return haversine;
 };
 
-const calculateEuclideanDistance = (point1, point2) => {
+const haversineDistanceMiles = (point1, point2) => {
+  const haversineValue = haversine(point1, point2);
+  const root = Math.sqrt(haversineValue);
+  const distance = 2 * EARTH_RADIUS_MILES * Math.asin(root);
+  return distance;
+};
+
+const euclideanDistanceMiles = (point1, point2) => {
   const dLat = point2.lat - point1.lat;
   const dLng = point2.lng - point1.lng;
   return Math.sqrt(dLat * dLat + dLng * dLng);
@@ -96,9 +101,4 @@ const calculateEuclideanDistance = (point1, point2) => {
 
 const EARTH_RADIUS_MILES = 3958.8; // average radius of Earth in miles
 
-export {
-  generateSamplePoints,
-  calculateMidpoint,
-  calculateMaxDistance,
-  calculateHaversineDistance,
-};
+export { generateSamplePoints, calculateMidpoint, calculateMaxDistance };
