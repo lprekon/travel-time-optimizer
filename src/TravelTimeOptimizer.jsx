@@ -8,6 +8,8 @@ import {
   calculateMaxDistance,
   generateSamplePoints,
 } from "./SphericalGeometry.js";
+import Destination from "./Destination.jsx";
+import DestinationForm from "./DestinationForm.jsx";
 
 const API_BASE_URL = "https://api.mapbox.com";
 
@@ -15,106 +17,27 @@ const EARTH_RADIUS_MILES = 3958.8; // Radius of the Earth in miles
 
 const TravelTimeOptimizer = () => {
   const [destinations, setDestinations] = useState([]);
-  const [name, setName] = useState("");
-  const [address, setAddress] = useState("");
-  const [weight, setWeight] = useState("1");
   const [isCalculating, setIsCalculating] = useState(false);
   const [heatmapData, setHeatmapData] = useState([]);
-  const [error, setError] = useState("");
   const [mapCenter, setMapCenter] = useState([38.8352, -77.38]);
   const [mapZoom, setMapZoom] = useState(12);
   const [midpoint, setMidpoint] = useState(null);
   // const [sampleRadius, setSampleRadius] = useState(5);
   const mapRef = useRef(null);
 
-  const [pointsFired, setPointsFired] = useState(0);
-  const [totalPoints, setTotalPoints] = useState(0);
-
-  const geocodeAddress = async (addressString) => {
-    console.log("Geocoding address: ", addressString);
-    const API_KEY = import.meta.env.VITE_MAPBOX_TOKEN;
-    if (!API_KEY) {
-      setError("Mapbox API key is missing");
-      return null;
-    }
-    if (!addressString) {
-      setError("Address is required");
-      return null;
-    }
-    try {
-      const url =
-        API_BASE_URL +
-        "/search/geocode/v6/forward?q=" +
-        encodeURIComponent(addressString) +
-        "&access_token=" +
-        API_KEY;
-      const response = await fetch(url);
-      console.log("Response: ", response);
-      const data = await response.json();
-      console.log("Data: ", data);
-      if (data.features && data.features.length > 0) {
-        // received valid data
-        // get the first (best) result
-        const [lng, lat] = data.features[0].geometry.coordinates;
-        return { lat, lng };
-      } else {
-        // no results found
-        throw new Error("Address not found");
-      }
-    } catch (error) {
-      console.error("Error geocoding address: ", addressString);
-      setError("Error geocoding address: " + error.message);
-      return null;
-    }
-  };
-
+  // when the "add" button is clicked,
   const addDestination = async (e) => {
-    console.log("Adding destination: ", name, address, weight);
+    console.log("Adding destination");
     e.preventDefault();
-    if (!name || !address || !weight) {
-      setError("All fields are required");
-      return;
-    }
-    try {
-      var weightValue;
-      if (weight.includes("/")) {
-        const splitWeight = weight.split("/");
-        weightValue = parseFloat(splitWeight[0]) / parseFloat(splitWeight[1]);
-      } else {
-        weightValue = parseFloat(weight);
-      }
-      if (isNaN(weightValue) || weightValue <= 0) {
-        setError("Weight must be a positive number");
-        return;
-      }
-      const coordinates = await geocodeAddress(address);
-      if (!coordinates) {
-        return;
-      }
-
-      const newDestination = {
-        id: uuidv4(),
-        name,
-        address,
-        weight: weightValue,
-        coordinates,
-      };
-      console.log("New destination: ", newDestination);
-
-      setDestinations([...destinations, newDestination]);
-      console.log("Destinations: ", destinations);
-
-      // Reset form fields
-      setName("");
-      setAddress("");
-      setWeight("1");
-      setError("");
-      // setMidpoint(calculateMidpoint(destinations));
-    } catch (error) {
-      console.error("Error adding destination: ", error);
-      setError("Error adding destination: " + error.message);
-      return;
-    }
+    const newDest = {
+      id: uuidv4(),
+      name: "",
+      address: "",
+      weight: "1",
+      coordinates: {},
+      lockedAddress: false,
+    };
+    setDestinations([...destinations, newDest]);
   };
 
   const generateHeatMap = async () => {
@@ -237,13 +160,6 @@ const TravelTimeOptimizer = () => {
     return weightedTravelTimes;
   };
 
-  const handleAddDestination = async (e) => {
-    e.preventDefault();
-    console.log("Address test submitted");
-    setError("");
-    addDestination(e);
-  };
-
   const createIcon = (color) => {
     return L.divIcon({
       className: "custom-marker",
@@ -281,130 +197,74 @@ const TravelTimeOptimizer = () => {
     }
   };
 
+  const handleAddDestination = (destination) => {
+    destination.id = uuidv4();
+    const updatedDestinations = [...destinations, destination];
+    setDestinations(updatedDestinations);
+  };
+
+  const handleRemoveDestination = (index) => {
+    const updatedDestinations = destinations.filter(
+      (dest, destIndex) => destIndex !== index
+    );
+    setDestinations(updatedDestinations);
+  };
+
+  const handleWeightUpdate = (index, value) => {
+    console.log("Updating weight for index: ", index, value);
+    const newWeight = parseWeight(value);
+    if (isNaN(newWeight)) {
+      console.error("Invalid weight value");
+      return;
+    }
+    const destinationsCopy = [...destinations];
+    destinationsCopy[index].weight = value;
+    setDestinations(destinationsCopy);
+  };
+
+  const parseWeight = (weightString) => {
+    // check if weightSTring is a fraction
+    if (weightString.includes("/")) {
+      const parts = weightString.split("/");
+      return parseFloat(parts[0]) / parseFloat(parts[1]);
+    }
+    return parseFloat(weightString);
+  };
+
   // Update map when destinations change
   useEffect(() => {
-    if (destinations.length > 0) {
-      const newCenter = calculateMidpoint(destinations);
-      setMapCenter(newCenter);
-      setMidpoint(newCenter);
-
-      if (mapRef.current) {
-        mapRef.current.setView(newCenter, mapZoom);
-      }
+    if (mapRef.current) {
+      mapRef.current.setView(midpoint, mapZoom);
     }
-  }, [destinations]);
+  }, [midpoint]);
 
   return (
     <div className="p-4 max-w-6xl mx-auto">
       <h1 className="text-2xl font-bold mb-4">Travel Time Optimizer</h1>
 
-      <div className="mb-6">
-        <h2 className="text-xl font-semibold mb-2">Add Destinations</h2>
-        <form onSubmit={addDestination} className="p-4 bg-gray-100 rounded-lg">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <label className="block mb-1">Name</label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Work, Home, etc."
-                className="w-full p-2 border rounded"
-              />
-            </div>
-            <div className="md:col-span-2">
-              <label className="block mb-1">Address</label>
-              <input
-                type="text"
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                placeholder="123 Main St, City, State"
-                className="w-full p-2 border rounded"
-              />
-            </div>
-            <div>
-              <label className="block mb-1">Weight (e.g. 1, 1/7, 0.5)</label>
-              <input
-                type="text"
-                value={weight}
-                onChange={(e) => setWeight(e.target.value)}
-                placeholder="1"
-                className="w-full p-2 border rounded"
-              />
-            </div>
-          </div>
-          <button
-            type="submit"
-            className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-          >
-            Add Destination
-          </button>
-        </form>
+      <DestinationForm submitDest={handleAddDestination} />
 
-        {error && (
-          <div className="mt-2 p-2 bg-red-100 text-red-700 rounded">
-            {error}
-          </div>
-        )}
-      </div>
+      {destinations.map((dest, index) => (
+        <Destination
+          key={dest.id}
+          data={dest}
+          changeWeight={(value) => handleWeightUpdate(index, value)}
+          remove={() => handleRemoveDestination(index)}
+        />
+      ))}
 
-      <div className="mb-6">
-        <h2 className="text-xl font-semibold mb-2">Destinations</h2>
-        <div className="overflow-x-auto">
-          <table className="min-w-full bg-white rounded-lg overflow-hidden">
-            <thead className="bg-gray-100">
-              <tr>
-                <th className="p-3 text-left">Name</th>
-                <th className="p-3 text-left">Address</th>
-                <th className="p-3 text-left">Weight</th>
-                <th className="p-3 text-left">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {destinations.length === 0 ? (
-                <tr>
-                  <td colSpan="4" className="p-3 text-center text-gray-500">
-                    No destinations added yet
-                  </td>
-                </tr>
-              ) : (
-                destinations.map((dest) => (
-                  <tr key={dest.id} className="border-t">
-                    <td className="p-3">{dest.name}</td>
-                    <td className="p-3">{dest.address}</td>
-                    <td className="p-3">
-                      {typeof dest.weight === "number"
-                        ? dest.weight.toFixed(4)
-                        : dest.weight}
-                    </td>
-                    <td className="p-3">
-                      <button
-                        onClick={() => removeDestination(dest.id)}
-                        className="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-sm"
-                      >
-                        Remove
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="mt-4">
-          <button
-            onClick={generateHeatMap}
-            disabled={isCalculating || destinations.length < 2}
-            className={`px-4 py-2 rounded ${
-              isCalculating || destinations.length < 2
-                ? "bg-gray-300 cursor-not-allowed"
-                : "bg-green-500 text-white hover:bg-green-600"
-            }`}
-          >
-            {isCalculating ? "Calculating..." : "Generate Travel Time Heat Map"}
-          </button>
-        </div>
+      <div className="mt-4">
+        <button
+          onClick={generateHeatMap}
+          disabled={isCalculating || destinations.length < 2}
+          className={`px-4 py-2 rounded ${
+            isCalculating || destinations.length < 2
+              ? "bg-gray-300 cursor-not-allowed"
+              : "bg-green-500 text-white hover:bg-green-600"
+          }`}
+        >
+          {isCalculating ? "Calculating..." : "Generate Travel Time Heat Map"}
+        </button>
       </div>
 
       <div className="mb-4">
@@ -423,7 +283,7 @@ const TravelTimeOptimizer = () => {
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             />
 
-            {destinations.map((dest, index) => (
+            {/* {destinations.map((dest, index) => (
               <Marker
                 key={dest.id}
                 position={dest.coordinates}
@@ -449,7 +309,7 @@ const TravelTimeOptimizer = () => {
                   fillOpacity: 0.9,
                 }}
               />
-            )}
+            )} */}
 
             {heatmapData.map((point, index) => (
               <Circle
