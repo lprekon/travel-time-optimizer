@@ -45,17 +45,31 @@ const latMilesToLng = (lateralDisplacementMiles, lat) => {
   return lateralDisplacementMiles / (69 * Math.cos(lat * (Math.PI / 180)));
 };
 const calculateMidpoint = (destinations) => {
-  const latSum = destinations.reduce(
-    (sum, dest) => sum + dest.coordinates.lat,
-    0
-  );
-  const lngSum = destinations.reduce(
-    (sum, dest) => sum + dest.coordinates.lng,
-    0
-  );
-  const midLat = latSum / destinations.length;
-  const midLng = lngSum / destinations.length;
-  return { lat: midLat, lng: midLng };
+  console.log("Calculating midpoint over destinations...", destinations);
+  let maxLat = -Infinity;
+  let minLat = Infinity;
+  let maxLng = -Infinity;
+  let minLng = Infinity;
+  destinations.forEach((dest) => {
+    if (dest.coordinates.lat > maxLat) {
+      maxLat = dest.coordinates.lat;
+    }
+    if (dest.coordinates.lat < minLat) {
+      minLat = dest.coordinates.lat;
+    }
+    if (dest.coordinates.lng > maxLng) {
+      maxLng = dest.coordinates.lng;
+    }
+    if (dest.coordinates.lng < minLng) {
+      minLng = dest.coordinates.lng;
+    }
+  });
+  const midpoint = {
+    lat: (maxLat + minLat) / 2,
+    lng: (maxLng + minLng) / 2,
+  };
+  console.log("returning midpoint: ", midpoint);
+  return midpoint;
 };
 
 const calculateMaxDistance = (midpoint, destinations) => {
