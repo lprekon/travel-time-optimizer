@@ -55,7 +55,7 @@ const DestinationForm = ({ submitDest, geocodeClient }) => {
     submitDest(newDestination);
     setDName("");
     setAddress("");
-    setWeight("");
+    setWeight("1");
   };
 
   return (

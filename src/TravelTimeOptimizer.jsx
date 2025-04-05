@@ -19,9 +19,8 @@ const TravelTimeOptimizer = () => {
   const [destinations, setDestinations] = useState([]);
   const [isCalculating, setIsCalculating] = useState(false);
   const [heatmapData, setHeatmapData] = useState([]);
-  const [mapCenter, setMapCenter] = useState([38.8352, -77.38]);
   const [mapZoom, setMapZoom] = useState(12);
-  const [midpoint, setMidpoint] = useState(null);
+  const [midpoint, setMidpoint] = useState({ lat: 38.8352, lng: -77.38 });
   // const [sampleRadius, setSampleRadius] = useState(5);
   const mapRef = useRef(null);
 
@@ -145,23 +144,6 @@ const TravelTimeOptimizer = () => {
     return weightedTravelTimes;
   };
 
-  const getColor = (value) => {
-    // Red (1) to Yellow (0.5) to Green (0)
-    if (value <= 0.5) {
-      // Green to Yellow (0-0.5)
-      const r = Math.round(255 * (value * 2));
-      const g = 255;
-      const b = 0;
-      return `rgba(${r}, ${g}, ${b}, 0.7)`;
-    } else {
-      // Yellow to Red (0.5-1)
-      const r = 255;
-      const g = Math.round(255 * (1 - (value - 0.5) * 2));
-      const b = 0;
-      return `rgba(${r}, ${g}, ${b}, 0.7)`;
-    }
-  };
-
   const handleAddDestination = (destination) => {
     destination.id = uuidv4();
     const weightVal = parseWeight(destination.weight);
@@ -173,6 +155,8 @@ const TravelTimeOptimizer = () => {
     }
     const updatedDestinations = [...destinations, destination];
     setDestinations(updatedDestinations);
+    const newMidpoint = calculateMidpoint(updatedDestinations);
+    setMidpoint(newMidpoint);
   };
 
   const handleRemoveDestination = (index) => {
@@ -249,8 +233,8 @@ const TravelTimeOptimizer = () => {
 
         <PointViewer
           destinations={destinations}
-          heatmapData={heatmapData}
-          center={mapCenter}
+          heatmapPoints={heatmapData}
+          center={midpoint}
           zoom={mapZoom}
         />
 
