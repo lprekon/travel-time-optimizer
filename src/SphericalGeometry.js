@@ -74,7 +74,7 @@ const calculateMidpoint = (destinations) => {
 
 const calculateMaxDistance = (midpoint, destinations) => {
   console.log("Calculating max distance...");
-  let maxDistance = 5; // default to 5 miles
+  var maxDistance = 0;
   const distances = destinations.map((dest) => {
     // const distance = calculateHaversineDistance(midpoint, dest.coordinates);
     const distance = haversineDistanceMiles(midpoint, dest.coordinates);

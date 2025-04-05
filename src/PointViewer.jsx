@@ -27,11 +27,17 @@ const PointViewer = ({
       setMapBounds(null);
       return;
     }
-    const bounds = L.latLngBounds(
-      destinations.map((dest) => [dest.coordinates.lat, dest.coordinates.lng])
-    );
+    const allPoints = destinations
+      .map((dest) => [dest.coordinates.lat, dest.coordinates.lng])
+      .concat(
+        heatmapPoints.map((point) => [
+          point.coordinates.lat,
+          point.coordinates.lng,
+        ])
+      );
+    const bounds = L.latLngBounds(allPoints);
     setMapBounds(bounds);
-  }, [destinations]);
+  }, [destinations, heatmapPoints]);
 
   const createDestIcon = (color) => {
     return L.divIcon({

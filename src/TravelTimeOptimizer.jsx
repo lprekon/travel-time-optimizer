@@ -15,6 +15,8 @@ const geocodeClient = geocodingFactory({
   accessToken: import.meta.env.VITE_MAPBOX_TOKEN,
 });
 
+const MIN_RADIUS = 5;
+
 const TravelTimeOptimizer = () => {
   const [destinations, setDestinations] = useState([]);
   const [isCalculating, setIsCalculating] = useState(false);
@@ -24,6 +26,8 @@ const TravelTimeOptimizer = () => {
   // const [sampleRadius, setSampleRadius] = useState(5);
   const mapRef = useRef(null);
 
+  const [radiusFactor, setRadiusFactor] = useState(1.0);
+
   const generateHeatMap = async () => {
     console.log("Generating heatmap data...");
     setHeatmapData([]);
@@ -31,7 +35,9 @@ const TravelTimeOptimizer = () => {
     // setIsCalculating(true);
 
     const midpoint = calculateMidpoint(destinations);
-    const radius = calculateMaxDistance(midpoint, destinations);
+    var radius = calculateMaxDistance(midpoint, destinations);
+    radius = Math.max(radius, MIN_RADIUS);
+    radius *= radiusFactor; // multiply by the radius factor
 
     // generate sample points around the midpoint
     const samplePoints = generateSamplePoints(
@@ -147,6 +153,7 @@ const TravelTimeOptimizer = () => {
   };
 
   const handleAddDestination = (destination) => {
+    setHeatmapData([]); // clear the heatmap data when a new destination is added
     destination.id = uuidv4();
     const weightVal = parseWeight(destination.weight);
     if (isNaN(weightVal)) {
@@ -162,6 +169,7 @@ const TravelTimeOptimizer = () => {
   };
 
   const handleRemoveDestination = (index) => {
+    setHeatmapData([]); // clear the heatmap data when a destination is removed
     const updatedDestinations = destinations.filter(
       (dest, destIndex) => destIndex !== index
     );
@@ -182,6 +190,11 @@ const TravelTimeOptimizer = () => {
       destinationsCopy[index].validWeight = true;
     }
     setDestinations(destinationsCopy);
+  };
+
+  const handleRadiusFactorChange = (value) => {
+    setRadiusFactor(value);
+    setHeatmapData([]); // clear the heatmap data when the radius factor changes
   };
 
   const parseWeight = (weightString) => {
@@ -219,6 +232,18 @@ const TravelTimeOptimizer = () => {
       ))}
 
       <div className="mt-4">
+        <div>
+          <input
+            type="range"
+            min="1"
+            max="2"
+            step="0.1"
+            value={radiusFactor}
+            onChange={(e) => handleRadiusFactorChange(e.target.value)}
+          />
+          <span>Radius multiplication factor: {radiusFactor}</span>
+        </div>
+
         <button
           onClick={generateHeatMap}
           disabled={isCalculating || destinations.length < 1}
