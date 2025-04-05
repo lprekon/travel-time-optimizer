@@ -199,6 +199,13 @@ const TravelTimeOptimizer = () => {
 
   const handleAddDestination = (destination) => {
     destination.id = uuidv4();
+    const weightVal = parseWeight(destination.weight);
+    if (isNaN(weightVal)) {
+      destination.validWeight = false;
+    } else {
+      destination.weight = weightVal;
+      destination.validWeight = true;
+    }
     const updatedDestinations = [...destinations, destination];
     setDestinations(updatedDestinations);
   };
@@ -211,14 +218,16 @@ const TravelTimeOptimizer = () => {
   };
 
   const handleWeightUpdate = (index, value) => {
+    const destinationsCopy = [...destinations];
     console.log("Updating weight for index: ", index, value);
     const newWeight = parseWeight(value);
+    console.log("Parsed weight: ", newWeight);
     if (isNaN(newWeight)) {
-      console.error("Invalid weight value");
-      return;
+      destinationsCopy[index].validWeight = false;
+    } else {
+      destinationsCopy[index].weight = newWeight;
+      destinationsCopy[index].validWeight = true;
     }
-    const destinationsCopy = [...destinations];
-    destinationsCopy[index].weight = value;
     setDestinations(destinationsCopy);
   };
 

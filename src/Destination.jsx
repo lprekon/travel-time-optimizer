@@ -7,10 +7,14 @@ const Destination = ({ data, changeWeight, remove }) => {
       <span>{data.address}</span>
       <input
         type="text"
-        value={data.weight}
+        value={weight}
         onChange={(e) => setWeight(e.target.value)}
         onBlur={() => changeWeight(weight)}
         placeholder="Weight"
+        // set the border to red if data.validWeight is false
+        style={{
+          border: data.validWeight ? "" : "1px solid red",
+        }}
       />
       <button onClick={remove}>Remove</button>
     </div>
