@@ -1,8 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
 import { v4 as uuidv4 } from "uuid";
-import { MapContainer, TileLayer, Marker, Popup, Circle } from "react-leaflet";
-import "leaflet/dist/leaflet.css";
-import L from "leaflet";
 import {
   calculateMidpoint,
   calculateMaxDistance,
@@ -10,6 +7,7 @@ import {
 } from "./SphericalGeometry.js";
 import Destination from "./Destination.jsx";
 import DestinationForm from "./DestinationForm.jsx";
+import PointViewer from "./PointViewer.jsx";
 
 import geocodingFactory from "@mapbox/mapbox-sdk/services/geocoding-v6";
 
@@ -147,26 +145,6 @@ const TravelTimeOptimizer = () => {
     return weightedTravelTimes;
   };
 
-  const createIcon = (color) => {
-    return L.divIcon({
-      className: "custom-marker",
-      html: `<div style="
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        background-color: ${color};
-        border: 2px solid white;
-        box-shadow: 0 0 5px rgba(0,0,0,0.5);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: white;
-        font-weight: bold;
-      "></div>`,
-      iconSize: [24, 24],
-      iconAnchor: [12, 12],
-    });
-  };
   const getColor = (value) => {
     // Red (1) to Yellow (0.5) to Green (0)
     if (value <= 0.5) {
@@ -268,62 +246,13 @@ const TravelTimeOptimizer = () => {
 
       <div className="mb-4">
         <h2 className="text-xl font-semibold mb-2">Travel Time Heat Map</h2>
-        <div style={{ height: "600px", width: "100%" }}>
-          <MapContainer
-            center={mapCenter}
-            zoom={mapZoom}
-            style={{ height: "100%", width: "100%" }}
-            whenCreated={(map) => {
-              mapRef.current = map;
-            }}
-          >
-            <TileLayer
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            />
 
-            {/* {destinations.map((dest, index) => (
-              <Marker
-                key={dest.id}
-                position={dest.coordinates}
-                icon={createIcon("#3949AB")}
-              >
-                <Popup>
-                  <div>
-                    <h3 className="font-bold">{dest.name}</h3>
-                    <p>{dest.address}</p>
-                    <p>Weight: {dest.weight.toFixed(4)}</p>
-                  </div>
-                </Popup>
-              </Marker>
-            ))}
-
-            {midpoint && (
-              <Circle
-                center={midpoint}
-                radius={121}
-                pathOptions={{
-                  color: "black",
-                  fillColor: "black",
-                  fillOpacity: 0.9,
-                }}
-              />
-            )} */}
-
-            {heatmapData.map((point, index) => (
-              <Circle
-                key={`heat-${index}`}
-                center={point.coordinates}
-                radius={121}
-                pathOptions={{
-                  color: "transparent",
-                  fillColor: getColor(point.normalizedTime),
-                  fillOpacity: 0.7,
-                }}
-              ></Circle>
-            ))}
-          </MapContainer>
-        </div>
+        <PointViewer
+          destinations={destinations}
+          heatmapData={heatmapData}
+          center={mapCenter}
+          zoom={mapZoom}
+        />
 
         {heatmapData.length > 0 && (
           <div className="mt-2 flex items-center justify-center">
