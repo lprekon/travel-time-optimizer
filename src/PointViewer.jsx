@@ -163,7 +163,7 @@ const MapUpdater = ({ bounds }) => {
       console.log("No bounds to fit");
       return;
     }
-    map.fitBounds(bounds, { maxZoom: 15 });
+    map.fitBounds(bounds, { maxZoom: 13 });
   }, [bounds]);
   return null;
 };

@@ -164,6 +164,8 @@ const TravelTimeOptimizer = () => {
       (dest, destIndex) => destIndex !== index
     );
     setDestinations(updatedDestinations);
+    const newMidpoint = calculateMidpoint(updatedDestinations);
+    setMidpoint(newMidpoint);
   };
 
   const handleWeightUpdate = (index, value) => {
