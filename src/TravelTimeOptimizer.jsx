@@ -11,9 +11,11 @@ import {
 import Destination from "./Destination.jsx";
 import DestinationForm from "./DestinationForm.jsx";
 
-const API_BASE_URL = "https://api.mapbox.com";
+import geocodingFactory from "@mapbox/mapbox-sdk/services/geocoding-v6";
 
-const EARTH_RADIUS_MILES = 3958.8; // Radius of the Earth in miles
+const geocodeClient = geocodingFactory({
+  accessToken: import.meta.env.VITE_MAPBOX_TOKEN,
+});
 
 const TravelTimeOptimizer = () => {
   const [destinations, setDestinations] = useState([]);
@@ -24,21 +26,6 @@ const TravelTimeOptimizer = () => {
   const [midpoint, setMidpoint] = useState(null);
   // const [sampleRadius, setSampleRadius] = useState(5);
   const mapRef = useRef(null);
-
-  // when the "add" button is clicked,
-  const addDestination = async (e) => {
-    console.log("Adding destination");
-    e.preventDefault();
-    const newDest = {
-      id: uuidv4(),
-      name: "",
-      address: "",
-      weight: "1",
-      coordinates: {},
-      lockedAddress: false,
-    };
-    setDestinations([...destinations, newDest]);
-  };
 
   const generateHeatMap = async () => {
     if (destinations.length < 2) {
@@ -251,7 +238,10 @@ const TravelTimeOptimizer = () => {
     <div className="p-4 max-w-6xl mx-auto">
       <h1 className="text-2xl font-bold mb-4">Travel Time Optimizer</h1>
 
-      <DestinationForm submitDest={handleAddDestination} />
+      <DestinationForm
+        submitDest={handleAddDestination}
+        geocodeClient={geocodeClient}
+      />
 
       {destinations.map((dest, index) => (
         <Destination

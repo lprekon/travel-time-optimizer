@@ -1,22 +1,38 @@
 import React, { useState } from "react";
 
-const DestinationForm = ({ submitDest }) => {
+const DestinationForm = ({ submitDest, geocodeClient }) => {
   const [dName, setDName] = useState("");
   const [address, setAddress] = useState("");
   const [weight, setWeight] = useState("1");
   const [errorMessage, setErrorMessage] = useState("");
+  const [validAddress, setValidAddress] = useState(true);
 
   const geocodeAddress = async (address) => {
     // use SDK
-
-    return {
-      lat: 0,
-      lng: 0,
-    };
+    return geocodeClient
+      .forwardGeocode({
+        query: address,
+        limit: 1,
+      })
+      .send()
+      .then((response) => {
+        const statusCode = response.statusCode;
+        if (statusCode != 200) {
+          console.error("Error geocoding address", response);
+        }
+        const body = response.body;
+        const coordinates = body.features[0].geometry.coordinates;
+        console.log("Geocoded coordinates:", coordinates);
+        return {
+          lat: coordinates[1],
+          lng: coordinates[0],
+        };
+      });
   };
 
   const handleSubmit = async (e) => {
     setErrorMessage("");
+    setValidAddress(true);
     e.preventDefault();
     console.log("Submitting destination:", dName, address, weight);
     if (!address || !weight) {
@@ -27,6 +43,7 @@ const DestinationForm = ({ submitDest }) => {
     console.log("Coordinates:", coordinates);
     if (!coordinates) {
       setErrorMessage("Invalid address");
+      setValidAddress(false);
       return;
     }
     const newDestination = {
@@ -55,6 +72,9 @@ const DestinationForm = ({ submitDest }) => {
           value={address}
           onChange={(e) => setAddress(e.target.value)}
           placeholder="Address"
+          style={{
+            border: validAddress ? "" : "1px solid red",
+          }}
         />
         <input
           type="text"
