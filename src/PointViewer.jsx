@@ -14,7 +14,7 @@ const PointViewer = ({
   destinations,
   heatmapPoints,
   zoom: mapStartingZoom,
-  center: mapStartingCenter,
+  midpoint,
 }) => {
   const [mapBounds, setMapBounds] = useState(null);
 
@@ -22,6 +22,7 @@ const PointViewer = ({
   // this will trigger the MapUpdater to update the map bounds
   // and fit the map to the new bounds
   useEffect(() => {
+    console.log("Calculating map bounds...");
     if (!destinations || destinations.length === 0) {
       setMapBounds(null);
       return;
@@ -95,7 +96,7 @@ const PointViewer = ({
   return (
     <div style={{ height: "600px", width: "800px" }}>
       <MapContainer
-        center={mapStartingCenter}
+        center={midpoint} // only triggers when the map is created
         zoom={mapStartingZoom}
         style={{ height: "100%", width: "100%" }}
         whenCreated={(map) => {
@@ -107,12 +108,12 @@ const PointViewer = ({
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         />
 
-        <Marker position={mapStartingCenter} icon={createDestIcon("green")}>
+        <Marker position={midpoint} icon={createDestIcon("green")}>
           <Popup>
             <div>
               <h3>Midpoint</h3>
               <p>
-                Coordinates: {mapStartingCenter.lat}, {mapStartingCenter.lng}
+                Coordinates: {midpoint.lat}, {midpoint.lng}
               </p>
             </div>
           </Popup>
@@ -139,31 +140,33 @@ const PointViewer = ({
         {heatmapPoints.map((point, index) => (
           <Marker
             key={index}
-            position={[point.lat, point.lng]}
-            icon={createHeatIcon(point.value)}
+            position={point.coordinates}
+            icon={createDestIcon("red")}
           >
             <Popup>
               <div>
-                <h3>Normalized Travel Time: {point.value}</h3>
+                <h3>Normalized Travel Time: {point.travelTime}</h3>
               </div>
             </Popup>
           </Marker>
         ))}
-        <MapUpdater bounds={mapBounds} />
+        <MapUpdater bounds={mapBounds} defaultCenter={midpoint} />
       </MapContainer>
     </div>
   );
 };
 
-const MapUpdater = ({ bounds }) => {
+const MapUpdater = ({ bounds, defaultCenter }) => {
   const map = useMap();
+  const DEFAULT_ZOOM = 12;
   useEffect(() => {
     console.log("Fitting map to bounds:", bounds);
     if (!bounds) {
       console.log("No bounds to fit");
+      map.setView(defaultCenter, DEFAULT_ZOOM);
       return;
     }
-    map.fitBounds(bounds, { maxZoom: 13 });
+    map.fitBounds(bounds, { maxZoom: DEFAULT_ZOOM });
   }, [bounds]);
   return null;
 };
