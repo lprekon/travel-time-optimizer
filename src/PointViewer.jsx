@@ -8,13 +8,14 @@ import {
 } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
-import { useState, useEffect } from "react";
+import { useState, useEffect, use } from "react";
 
 const PointViewer = ({
   destinations,
   heatmapPoints,
   zoom: mapStartingZoom,
   midpoint,
+  radius,
 }) => {
   const [mapBounds, setMapBounds] = useState(null);
 
@@ -38,6 +39,10 @@ const PointViewer = ({
     const bounds = L.latLngBounds(allPoints);
     setMapBounds(bounds);
   }, [destinations, heatmapPoints]);
+
+  useEffect(() => {
+    console.log("working with radius: ", radius);
+  }, [radius]);
 
   const createDestIcon = (color) => {
     return L.divIcon({
@@ -83,16 +88,12 @@ const PointViewer = ({
       html: `<div style="
               width: 8px;
               height: 8px;
-              border-radius: 50%;
               background-color: ${heatmapColor};
-              border: 2px solid white;
-              box-shadow: 0 0 5px rgba(0,0,0,0.5);
               display: flex;
               align-items: center;
               justify-content: center;
               color: white;
               font-weight: bold;
-              opacity: 0.7;
             "></div>`,
       iconSize: [24, 24],
       iconAnchor: [12, 12],
@@ -144,17 +145,17 @@ const PointViewer = ({
         ))}
 
         {heatmapPoints.map((point, index) => (
-          <Marker
+          <Circle
             key={index}
-            position={point.coordinates}
-            icon={createDestIcon("red")}
-          >
-            <Popup>
-              <div>
-                <h3>Normalized Travel Time: {point.travelTime}</h3>
-              </div>
-            </Popup>
-          </Marker>
+            center={[point.coordinates.lat, point.coordinates.lng]}
+            radius={400}
+            pathOptions={{
+              color: "red",
+              opacity: 0.0,
+              fillColor: "red",
+              fillOpacity: 0.5,
+            }}
+          />
         ))}
         <MapUpdater bounds={mapBounds} defaultCenter={midpoint} />
       </MapContainer>

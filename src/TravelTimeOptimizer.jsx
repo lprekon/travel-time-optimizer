@@ -10,8 +10,12 @@ import DestinationForm from "./DestinationForm.jsx";
 import PointViewer from "./PointViewer.jsx";
 
 import geocodingFactory from "@mapbox/mapbox-sdk/services/geocoding-v6";
+import matrixFactory from "@mapbox/mapbox-sdk/services/matrix";
 
 const geocodeClient = geocodingFactory({
+  accessToken: import.meta.env.VITE_MAPBOX_TOKEN,
+});
+const matrixClient = matrixFactory({
   accessToken: import.meta.env.VITE_MAPBOX_TOKEN,
 });
 
@@ -27,6 +31,7 @@ const TravelTimeOptimizer = () => {
   const mapRef = useRef(null);
 
   const [radiusFactor, setRadiusFactor] = useState(1.0);
+  const [radius, setRadius] = useState(MIN_RADIUS);
 
   const generateHeatMap = async () => {
     console.log("Generating heatmap data...");
@@ -35,15 +40,17 @@ const TravelTimeOptimizer = () => {
     // setIsCalculating(true);
 
     const midpoint = calculateMidpoint(destinations);
-    var radius = calculateMaxDistance(midpoint, destinations);
-    radius = Math.max(radius, MIN_RADIUS);
-    radius *= radiusFactor; // multiply by the radius factor
+    var radius_local = calculateMaxDistance(midpoint, destinations);
+    radius_local = Math.max(radius_local, MIN_RADIUS);
+    radius_local *= radiusFactor; // multiply by the radius factor
+    setRadius(radius_local);
+    console.log("radius: ", radius_local);
 
     // generate sample points around the midpoint
     const samplePoints = generateSamplePoints(
       midpoint,
-      radius,
-      Math.max(0.5, radius / 10)
+      radius_local,
+      Math.max(0.5, radius_local / 10)
     );
     console.log("Sample points: ", samplePoints);
     // setHeatmapData(samplePoints);
@@ -88,7 +95,7 @@ const TravelTimeOptimizer = () => {
       });
     }
     setHeatmapData(results);
-    console.log("heatmap data set", heatmapData);
+    console.log("heatmap data set");
     return;
 
     // normalize the results
