@@ -11,6 +11,7 @@ import PointViewer from "./PointViewer.jsx";
 
 import geocodingFactory from "@mapbox/mapbox-sdk/services/geocoding-v6";
 import matrixFactory from "@mapbox/mapbox-sdk/services/matrix";
+import matrix from "@mapbox/mapbox-sdk/services/matrix";
 
 const geocodeClient = geocodingFactory({
   accessToken: import.meta.env.VITE_MAPBOX_TOKEN,
@@ -60,25 +61,14 @@ const TravelTimeOptimizer = () => {
     console.log("Firing off travel time requests...");
     for (const point of samplePoints) {
       // for each sample point, get the travel times to all destinations
-      const promise = getRawTravelTimes(point);
-      const promise2 = promise.then((response) => {
-        // if (!response.ok) {
-        //   throw new Error("Error fetching travel times");
-        // }
-        // const data = response.json();
-        // const weightedTravelTimes = weightTravelTimes(
-        //   data.durations[0].slice(1)
-        // ); // skip the first element (the travel time to itself)
-        // // return the average
-        // return (
-        //   weightedTravelTimes.reduce((a, b) => a + b, 0) /
-        //   weightedTravelTimes.length
-        // );
-
-        // for now, just return a 1
-        return 1;
-      });
-      travelTimePromises.push(promise2);
+      travelTimePromises.push(
+        getRawTravelTimes(point).then((rawTravelTimes) => {
+          console.log("Raw travel times: ", rawTravelTimes);
+          return rawTravelTimes.map((time, index) => {
+            return time * destinations[index].weight;
+          });
+        })
+      );
     }
     console.log("Waiting for travel time requests to finish...");
     // wait for all the weighted times to come back before continuing. It'll be easier to pair each row of results up with the proper sample point out here
@@ -87,15 +77,19 @@ const TravelTimeOptimizer = () => {
       weightedAverageTravelTimes.length === samplePoints.length,
       "Mismatch in lengths"
     );
+    console.log("Weighted average travel times: ", weightedAverageTravelTimes);
     const results = [];
     for (let i = 0; i < samplePoints.length; i++) {
       results.push({
         coordinates: samplePoints[i],
-        travelTime: weightedAverageTravelTimes[i],
+        travelTime: weightedAverageTravelTimes[i].reduce(
+          (acc, time) => acc + time,
+          0
+        ),
       });
     }
     setHeatmapData(results);
-    console.log("heatmap data set");
+    console.log("heatmap data set", results);
     return;
 
     // normalize the results
@@ -111,52 +105,36 @@ const TravelTimeOptimizer = () => {
     setHeatmapData(normalizedResults);
   };
 
-  // Get the travel times from the Mapbox API, returning the Promise
+  // Return a promise that resolves to the raw travel times from this point to all destinations
   const getRawTravelTimes = (point) => {
-    // const API_KEY = import.meta.env.VITE_MAPBOX_TOKEN;
-    // if (!API_KEY) {
-    //   setError("Mapbox API key is missing");
-    //   return null;
-    // }
-    // if (!point) {
-    //   setError("point is required");
-    //   return null;
-    // }
-
-    // var apiParams = {
-    //   sources: "0",
-    //   destinations: "",
-    //   access_token: import.meta.env.VITE_MAPBOX_TOKEN,
-    // };
-    // let coordinates = point.lng + "," + point.lat + ";";
-    // let pointIndex = 1;
-    // destinations.forEach((destination) => {
-    //   coordinates +=
-    //     destination.coordinates.lng + "," + destination.coordinates.lat + ";";
-    //   apiParams.destinations += pointIndex + ";";
-    //   pointIndex++;
-    // });
-    // console.log(apiParams);
-    // coordinates = coordinates.slice(0, -1); // remove last semicolon
-    // apiParams.destinations = apiParams.destinations.slice(0, -1); // remove last semicolon
-    // console.log("API params: ", apiParams);
-    // const url =
-    //   API_BASE_URL +
-    //   "/directions-matrix/v1/driving/" +
-    //   coordinates +
-    //   "?" +
-    //   new URLSearchParams(apiParams);
-    // console.log("URL: ", url);
-    // return fetch(url); // return the fetch promise
-    return Promise.resolve(1);
-  };
-
-  const weightTravelTimes = (rawTravelTimes) => {
-    const weightedTravelTimes = rawTravelTimes.map((time, index) => {
-      const weight = destinations[index].weight;
-      return time * weight;
+    // create a matrix request for the point and all destinations
+    const matrixRequestConfig = {
+      profile: "driving",
+      points: [{ coordinates: [point.lng, point.lat] }],
+      sources: [0],
+      destinations: [],
+    };
+    // add all the destinations to the request
+    destinations.forEach((dest, index) => {
+      matrixRequestConfig.points.push({
+        coordinates: [dest.coordinates.lng, dest.coordinates.lat],
+      });
+      matrixRequestConfig.destinations.push(index + 1);
     });
-    return weightedTravelTimes;
+
+    // console.log("Matrix request config: ", matrixRequestConfig);
+    // Create the promise, .then() it to parse the response, then return the promise which will resolve to the parsed response
+    const matrixRequest = matrixClient.getMatrix(matrixRequestConfig);
+    return matrixRequest.send().then((response) => {
+      const statusCode = response.statusCode;
+      if (statusCode != 200) {
+        console.error("Error fetching travel times", response);
+        return [];
+      }
+      const body = response.body;
+      // console.log("Travel times: ", body);
+      return body.durations[0];
+    });
   };
 
   const handleAddDestination = (destination) => {

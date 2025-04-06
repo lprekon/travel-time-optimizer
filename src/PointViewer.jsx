@@ -18,6 +18,8 @@ const PointViewer = ({
   radius,
 }) => {
   const [mapBounds, setMapBounds] = useState(null);
+  const [travelMax, setTravelMax] = useState(0);
+  const [travelMin, setTravelMin] = useState(0);
 
   // when destinations change, update the map bounds state
   // this will trigger the MapUpdater to update the map bounds
@@ -40,9 +42,26 @@ const PointViewer = ({
     setMapBounds(bounds);
   }, [destinations, heatmapPoints]);
 
+  // log the radius for debugging
   useEffect(() => {
     console.log("working with radius: ", radius);
   }, [radius]);
+
+  // calculate the max and min travel times for the heatmap
+  useEffect(() => {
+    var localMin = Infinity;
+    var localMax = -Infinity;
+    heatmapPoints.forEach((point) => {
+      if (point.travelTime < localMin) {
+        localMin = point.travelTime;
+      }
+      if (point.travelTime > localMax) {
+        localMax = point.travelTime;
+      }
+    });
+    setTravelMin(localMin);
+    setTravelMax(localMax);
+  }, [heatmapPoints]);
 
   const createDestIcon = (color) => {
     return L.divIcon({
@@ -64,8 +83,9 @@ const PointViewer = ({
       iconAnchor: [12, 12],
     });
   };
-  const getColor = (value) => {
+  const getColor = (travelTime) => {
     // Red (1) to Yellow (0.5) to Green (0)
+    var value = (travelTime - travelMin) / (travelMax - travelMin);
     if (value <= 0.5) {
       // Green to Yellow (0-0.5)
       const r = Math.round(255 * (value * 2));
@@ -150,12 +170,23 @@ const PointViewer = ({
             center={[point.coordinates.lat, point.coordinates.lng]}
             radius={400}
             pathOptions={{
-              color: "red",
+              color: getColor(point.travelTime),
+              fillColor: getColor(point.travelTime),
               opacity: 0.0,
-              fillColor: "red",
-              fillOpacity: 0.5,
+              fillOpacity: 0.7,
             }}
-          />
+          >
+            <Popup>
+              <div>
+                <h3>Travel Time</h3>
+                <p>
+                  {point.travelTime / 60} minutes
+                  <br />
+                  Coordinates: {point.coordinates.lat}, {point.coordinates.lng}
+                </p>
+              </div>
+            </Popup>
+          </Circle>
         ))}
         <MapUpdater bounds={mapBounds} defaultCenter={midpoint} />
       </MapContainer>

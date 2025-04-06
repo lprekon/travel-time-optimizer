@@ -1,3 +1,5 @@
+const MAX_POINTS = 10000;
+
 // generate samplepoints around the midpoint outside the radius, which a spaceing in miles of gridSpacing, defaulting to 0.5 miles
 const generateSamplePoints = (midpoint, radius, gridSpacing = 0.5) => {
   console.log("Generating sample points...");
@@ -11,7 +13,7 @@ const generateSamplePoints = (midpoint, radius, gridSpacing = 0.5) => {
   const samplePoints = [];
 
   let pointCount = 0;
-  const cosCR = Math.cos(radius / EARTH_RADIUS_MILES); // calculate the cosine of the angle subtended by an arc `radius` miles on the surface of the Earth
+
   // this is the "dumber" but simpler way to generate sample points.
   for (let vDisM = -radius; vDisM <= radius; vDisM += gridSpacing) {
     for (let hDisM = -radius; hDisM <= radius; hDisM += gridSpacing) {
@@ -27,7 +29,7 @@ const generateSamplePoints = (midpoint, radius, gridSpacing = 0.5) => {
       samplePoints.push(newPoint);
 
       pointCount++;
-      if (pointCount >= 1000000) {
+      if (pointCount >= MAX_POINTS) {
         console.log("Point count exceeded 1 million, stopping generation");
         return samplePoints;
       }
