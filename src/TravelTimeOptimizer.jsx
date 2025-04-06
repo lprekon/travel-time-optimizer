@@ -11,7 +11,6 @@ import PointViewer from "./PointViewer.jsx";
 
 import geocodingFactory from "@mapbox/mapbox-sdk/services/geocoding-v6";
 import matrixFactory from "@mapbox/mapbox-sdk/services/matrix";
-import matrix from "@mapbox/mapbox-sdk/services/matrix";
 
 const geocodeClient = geocodingFactory({
   accessToken: import.meta.env.VITE_MAPBOX_TOKEN,
@@ -64,45 +63,34 @@ const TravelTimeOptimizer = () => {
       travelTimePromises.push(
         getRawTravelTimes(point).then((rawTravelTimes) => {
           console.log("Raw travel times: ", rawTravelTimes);
-          return rawTravelTimes.map((time, index) => {
-            return time * destinations[index].weight;
-          });
+          return rawTravelTimes;
         })
       );
     }
     console.log("Waiting for travel time requests to finish...");
     // wait for all the weighted times to come back before continuing. It'll be easier to pair each row of results up with the proper sample point out here
-    const weightedAverageTravelTimes = await Promise.all(travelTimePromises);
+    const rawTravelTimes = await Promise.all(travelTimePromises);
     console.assert(
-      weightedAverageTravelTimes.length === samplePoints.length,
+      rawTravelTimes.length === samplePoints.length,
       "Mismatch in lengths"
     );
-    console.log("Weighted average travel times: ", weightedAverageTravelTimes);
     const results = [];
     for (let i = 0; i < samplePoints.length; i++) {
+      const weightedTravelTimes = rawTravelTimes[i].map((time, index) => {
+        return time * destinations[index].weight;
+      });
+      const totalTravelTime = weightedTravelTimes.reduce(
+        (acc, time) => acc + time,
+        0
+      );
       results.push({
         coordinates: samplePoints[i],
-        travelTime: weightedAverageTravelTimes[i].reduce(
-          (acc, time) => acc + time,
-          0
-        ),
+        rawTravelTimes: rawTravelTimes[i],
+        totalTravelTime: totalTravelTime,
       });
     }
     setHeatmapData(results);
     console.log("heatmap data set", results);
-    return;
-
-    // normalize the results
-    const timeValues = results.map((result) => result.avgTravelTime);
-    const minTime = Math.min(...timeValues);
-    const maxTime = Math.max(...timeValues);
-    const normalizedResults = results.map((result) => ({
-      ...result,
-      normalizedTime: (result.avgTravelTime - minTime) / (maxTime - minTime),
-    }));
-    console.log("Normalized results: ", normalizedResults);
-    setIsCalculating(false);
-    setHeatmapData(normalizedResults);
   };
 
   // Return a promise that resolves to the raw travel times from this point to all destinations
@@ -173,7 +161,22 @@ const TravelTimeOptimizer = () => {
     } else {
       destinationsCopy[index].weight = newWeight;
       destinationsCopy[index].validWeight = true;
+
+      // reweight the heatmap data
+      console.log("Reweighting heatmap data...");
+      for (let i = 0; i < heatmapData.length; i++) {
+        const rawTravelTimes = heatmapData[i].rawTravelTimes;
+        const weightedTravelTimes = rawTravelTimes.map((time, index) => {
+          return time * destinationsCopy[index].weight;
+        });
+        const totalTravelTime = weightedTravelTimes.reduce(
+          (acc, time) => acc + time,
+          0
+        );
+        heatmapData[i].totalTravelTime = totalTravelTime;
+      }
     }
+
     setDestinations(destinationsCopy);
   };
 
