@@ -7,8 +7,8 @@ const DestinationForm = ({ submitDest, geocodeClient }) => {
   const [errorMessage, setErrorMessage] = useState("");
   const [validAddress, setValidAddress] = useState(true);
   const [timeSpecific, setTimeSpecific] = useState(true);
-  const [arriveTime, setArriveTime] = useState("");
-  const [departTime, setDepartTime] = useState("");
+  const [departFor, setDepartFor] = useState("");
+  const [departFrom, setDepartFrom] = useState("");
   const [weekday, setWeekday] = useState(false);
 
   const geocodeAddress = async (address) => {
@@ -53,8 +53,8 @@ const DestinationForm = ({ submitDest, geocodeClient }) => {
     var time = null;
     if (timeSpecific) {
       time = {
-        arriveTime: arriveTime,
-        departTime: departTime,
+        departFor: departFor,
+        departFrom: departFrom,
         weekday: weekday,
       };
     }
@@ -107,19 +107,19 @@ const DestinationForm = ({ submitDest, geocodeClient }) => {
         {timeSpecific && (
           <div>
             <label>
-              Arrive by
+              Leave For
               <input
                 type="time"
-                value={arriveTime}
-                onChange={(e) => setArriveTime(e.target.value)}
+                value={departFor}
+                onChange={(e) => setDepartFor(e.target.value)}
               />
             </label>
             <label>
-              Depart at
+              Leave From
               <input
                 type="time"
-                value={departTime}
-                onChange={(e) => setDepartTime(e.target.value)}
+                value={departFrom}
+                onChange={(e) => setDepartFrom(e.target.value)}
               />
             </label>
             <label>

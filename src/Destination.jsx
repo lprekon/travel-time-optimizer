@@ -1,5 +1,11 @@
 import React, { useState } from "react";
-const Destination = ({ data, changeWeight, remove, changeTime }) => {
+const Destination = ({
+  data,
+  changeWeight,
+  remove,
+  changeTime,
+  changeWeekday,
+}) => {
   const [weight, setWeight] = useState(data.weight);
   return (
     <div className="destination">
@@ -26,16 +32,24 @@ const Destination = ({ data, changeWeight, remove, changeTime }) => {
             Arrive By
             <input
               type="time"
-              value={data.time.arriveTime}
-              onChange={(e) => changeTime("arriveTime", e.target.value)}
+              value={data.time.departFor}
+              onChange={(e) => changeTime("departFor", e.target.value)}
             />
           </label>
           <label>
             Depart At
             <input
               type="time"
-              value={data.time.departTime}
-              onChange={(e) => changeTime("departTime", e.target.value)}
+              value={data.time.departFrom}
+              onChange={(e) => changeTime("departFrom", e.target.value)}
+            />
+          </label>
+          <label>
+            Weekday
+            <input
+              type="checkbox"
+              checked={data.time.weekday}
+              onChange={(e) => changeWeekday(e.target.checked)}
             />
           </label>
         </div>
