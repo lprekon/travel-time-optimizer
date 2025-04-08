@@ -182,6 +182,13 @@ const TravelTimeOptimizer = () => {
     setDestinations(destinationsCopy);
   };
 
+  const handleTimeChange = (index, timeType, value) => {
+    const destinationsCopy = [...destinations];
+    destinationsCopy[index].time[timeType] = value;
+    setDestinations(destinationsCopy);
+    console.log("Time changed for index: ", index, timeType, value);
+  };
+
   const handleRadiusFactorChange = (value) => {
     setRadiusFactor(value);
     setHeatmapData([]); // clear the heatmap data when the radius factor changes
@@ -217,6 +224,9 @@ const TravelTimeOptimizer = () => {
           key={dest.id}
           data={dest}
           changeWeight={(value) => handleWeightUpdate(index, value)}
+          changeTime={(timeType, value) =>
+            handleTimeChange(index, timeType, value)
+          }
           remove={() => handleRemoveDestination(index)}
         />
       ))}
