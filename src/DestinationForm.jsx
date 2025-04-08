@@ -6,6 +6,10 @@ const DestinationForm = ({ submitDest, geocodeClient }) => {
   const [weight, setWeight] = useState("1");
   const [errorMessage, setErrorMessage] = useState("");
   const [validAddress, setValidAddress] = useState(true);
+  const [timeSpecific, setTimeSpecific] = useState(true);
+  const [arriveTime, setArriveTime] = useState("");
+  const [departTime, setDepartTime] = useState("");
+  const [weekday, setWeekday] = useState(false);
 
   const geocodeAddress = async (address) => {
     // use SDK
@@ -46,11 +50,20 @@ const DestinationForm = ({ submitDest, geocodeClient }) => {
       setValidAddress(false);
       return;
     }
+    var time = null;
+    if (timeSpecific) {
+      time = {
+        arriveTime: arriveTime,
+        departTime: departTime,
+        weekday: weekday,
+      };
+    }
     const newDestination = {
       name: dName,
       address: address,
       coordinates: coordinates,
       weight: weight,
+      time: time,
     };
     submitDest(newDestination);
     setDName("");
@@ -82,6 +95,43 @@ const DestinationForm = ({ submitDest, geocodeClient }) => {
           onChange={(e) => setWeight(e.target.value)}
           placeholder="Weight"
         />
+
+        <label>
+          Time Specific{" "}
+          <input
+            type="checkbox"
+            checked={timeSpecific}
+            onChange={(e) => setTimeSpecific(e.target.checked)}
+          />
+        </label>
+        {timeSpecific && (
+          <div>
+            <label>
+              Arrive by
+              <input
+                type="time"
+                value={arriveTime}
+                onChange={(e) => setArriveTime(e.target.value)}
+              />
+            </label>
+            <label>
+              Depart at
+              <input
+                type="time"
+                value={departTime}
+                onChange={(e) => setDepartTime(e.target.value)}
+              />
+            </label>
+            <label>
+              Weekday
+              <input
+                type="checkbox"
+                checked={weekday}
+                onChange={(e) => setWeekday(e.target.checked)}
+              />
+            </label>
+          </div>
+        )}
         <button onClick={handleSubmit}>Add</button>
       </div>
       {errorMessage && <div className="error-message">{errorMessage}</div>}
