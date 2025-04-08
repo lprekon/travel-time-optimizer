@@ -11,11 +11,15 @@ import PointViewer from "./PointViewer.jsx";
 
 import geocodingFactory from "@mapbox/mapbox-sdk/services/geocoding-v6";
 import matrixFactory from "@mapbox/mapbox-sdk/services/matrix";
+import directionsFactory from "@mapbox/mapbox-sdk/services/directions";
 
 const geocodeClient = geocodingFactory({
   accessToken: import.meta.env.VITE_MAPBOX_TOKEN,
 });
 const matrixClient = matrixFactory({
+  accessToken: import.meta.env.VITE_MAPBOX_TOKEN,
+});
+const directionsClient = directionsFactory({
   accessToken: import.meta.env.VITE_MAPBOX_TOKEN,
 });
 
@@ -55,20 +59,13 @@ const TravelTimeOptimizer = () => {
     console.log("Sample points: ", samplePoints);
     // setHeatmapData(samplePoints);
 
-    var travelTimePromises = [];
-    // fire off all the travel time API requests in parallel, let them process as they come in
     console.log("Firing off travel time requests...");
-    for (const point of samplePoints) {
-      // for each sample point, get the travel times to all destinations
-      travelTimePromises.push(
-        getRawTravelTimes(point).then((rawTravelTimes) => {
-          console.log("Raw travel times: ", rawTravelTimes);
-          return rawTravelTimes;
-        })
-      );
-    }
+    var travelTimePromises = samplePoints.map((point) => {
+      return getTimesForPoint(point);
+    });
+    // fire off all the travel time API requests in parallel, let them process as they come in
     console.log("Waiting for travel time requests to finish...");
-    // wait for all the weighted times to come back before continuing. It'll be easier to pair each row of results up with the proper sample point out here
+    // wait for all the weighted times to come back before continuing. We want both the raw times and the weighted times, and that's easier to manage out here
     const rawTravelTimes = await Promise.all(travelTimePromises);
     console.assert(
       rawTravelTimes.length === samplePoints.length,
@@ -93,36 +90,110 @@ const TravelTimeOptimizer = () => {
     console.log("heatmap data set", results);
   };
 
-  // Return a promise that resolves to the raw travel times from this point to all destinations
-  const getRawTravelTimes = (point) => {
-    // create a matrix request for the point and all destinations
-    const matrixRequestConfig = {
-      profile: "driving",
-      points: [{ coordinates: [point.lng, point.lat] }],
-      sources: [0],
-      destinations: [],
-    };
-    // add all the destinations to the request
-    destinations.forEach((dest, index) => {
-      matrixRequestConfig.points.push({
-        coordinates: [dest.coordinates.lng, dest.coordinates.lat],
-      });
-      matrixRequestConfig.destinations.push(index + 1);
+  // return a promise that resolves to the raw travel times from this point to/from all passed destinations, in the same order as the destinations array
+  const getTimesForPoint = (point) => {
+    var timePromises = destinations.map((dest) => {
+      return pointToDestTime(point, dest);
     });
+    return Promise.all(timePromises);
+  };
 
-    // console.log("Matrix request config: ", matrixRequestConfig);
-    // Create the promise, .then() it to parse the response, then return the promise which will resolve to the parsed response
-    const matrixRequest = matrixClient.getMatrix(matrixRequestConfig);
-    return matrixRequest.send().then((response) => {
-      const statusCode = response.statusCode;
-      if (statusCode != 200) {
-        console.error("Error fetching travel times", response);
-        return [];
-      }
-      const body = response.body;
-      // console.log("Travel times: ", body);
-      return body.durations[0];
-    });
+  // return a promise that resolves to the round-trip travel time from the point to the destination, at the specified departure times if specified
+  const pointToDestTime = (point, dest) => {
+    const baseConfig = {
+      // the API and SDK docs do not agree on how this should be formatted. This is the SDK way
+      waypoints: [
+        { coordinates: [point.lng, point.lat], radius: "unlimited" },
+        {
+          coordinates: [dest.coordinates.lng, dest.coordinates.lat],
+          radius: "unlimited",
+        },
+      ], // we'll always calculate from point to dest
+      overview: "false",
+    };
+    if (!dest.time) {
+      // no specified time, just get the one-way travel time with no time restrictions and double it
+      const requestConfig = { ...baseConfig, profile: "driving" };
+      return directionsClient
+        .getDirections(requestConfig)
+        .send()
+        .then((response) => {
+          if (response.statusCode != 200) {
+            console.error("Error fetching travel time", response);
+            return 0;
+          }
+          const data = response.body;
+          const routes = data.routes;
+          if (routes.length === 0) {
+            console.error("No routes found");
+            return 0;
+          }
+          const travelTime = routes[0].duration;
+          return travelTime * 2; // round trip
+        });
+    } else {
+      // specified time, so make two requests, one each way, and add them together
+      console.log("destination time: ", dest.time);
+      const dow = dest.time.weekday ? 1 : 6;
+      console.log("Using weekday: ", dow);
+      var dayOfTravel = new Date();
+      dayOfTravel.setDate(
+        dayOfTravel.getDate() + ((dow + (7 - dayOfTravel.getDay())) % 7)
+      );
+      console.log("Day of travel: ", dayOfTravel.toISOString());
+      const departForCongig = {
+        ...baseConfig,
+        profile: "driving-traffic",
+        departAt:
+          dayOfTravel.toISOString().split("T")[0] + "T" + dest.time.departFor,
+      };
+      // reorder the coordinates to be from the destination to the point
+      const departFromConfig = {
+        ...baseConfig,
+        profile: "driving-traffic",
+        departAt:
+          dayOfTravel.toISOString().split("T")[0] + "T" + dest.time.departFrom,
+        waypoints: [baseConfig.waypoints[1], baseConfig.waypoints[0]], // swap the order
+      };
+      console.log(
+        "Sending timebound requests",
+        departForCongig,
+        departFromConfig
+      );
+      const departForRequest = directionsClient
+        .getDirections(departForCongig)
+        .send();
+      const departFromRequest = directionsClient
+        .getDirections(departFromConfig)
+        .send();
+      return Promise.all([departForRequest, departFromRequest]).then(
+        (responses) => {
+          const departForResponse = responses[0];
+          const departFromResponse = responses[1];
+          if (
+            departForResponse.statusCode != 200 ||
+            departFromResponse.statusCode != 200
+          ) {
+            console.error(
+              "Error fetching travel time",
+              departForResponse,
+              departFromResponse
+            );
+            return 0;
+          }
+          const data1 = departForResponse.body;
+          const data2 = departFromResponse.body;
+          const routes1 = data1.routes;
+          const routes2 = data2.routes;
+          if (routes1.length === 0 || routes2.length === 0) {
+            console.error("No routes found");
+            return 0;
+          }
+          const travelTime = routes1[0].duration + routes2[0].duration; // round trip
+          return travelTime;
+        }
+      );
+    }
   };
 
   const handleAddDestination = (destination) => {
@@ -189,6 +260,13 @@ const TravelTimeOptimizer = () => {
     console.log("Time changed for index: ", index, timeType, value);
   };
 
+  const handleWeekdayChange = (index, value) => {
+    const destinationsCopy = [...destinations];
+    destinationsCopy[index].time.weekday = value;
+    setDestinations(destinationsCopy);
+    console.log("Weekday changed for index: ", index, value);
+  };
+
   const handleRadiusFactorChange = (value) => {
     setRadiusFactor(value);
     setHeatmapData([]); // clear the heatmap data when the radius factor changes
@@ -227,6 +305,7 @@ const TravelTimeOptimizer = () => {
           changeTime={(timeType, value) =>
             handleTimeChange(index, timeType, value)
           }
+          changeWeekday={(value) => handleWeekdayChange(index, value)}
           remove={() => handleRemoveDestination(index)}
         />
       ))}

@@ -1,4 +1,5 @@
 const MAX_POINTS = 10000;
+// const MAX_POINTS = 2; // DEBUGGING ONLY
 
 // generate samplepoints around the midpoint outside the radius, which a spaceing in miles of gridSpacing, defaulting to 0.5 miles
 const generateSamplePoints = (midpoint, radius, gridSpacing = 0.5) => {
