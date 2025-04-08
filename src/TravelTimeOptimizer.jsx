@@ -147,8 +147,10 @@ const TravelTimeOptimizer = () => {
       (dest, destIndex) => destIndex !== index
     );
     setDestinations(updatedDestinations);
-    const newMidpoint = calculateMidpoint(updatedDestinations);
-    setMidpoint(newMidpoint);
+    if (updatedDestinations.length > 0) {
+      const newMidpoint = calculateMidpoint(updatedDestinations);
+      setMidpoint(newMidpoint);
+    }
   };
 
   const handleWeightUpdate = (index, value) => {
@@ -209,7 +211,7 @@ const TravelTimeOptimizer = () => {
         submitDest={handleAddDestination}
         geocodeClient={geocodeClient}
       />
-
+      <hr />
       {destinations.map((dest, index) => (
         <Destination
           key={dest.id}
